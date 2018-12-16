@@ -982,6 +982,7 @@ class Abstract_Wallet(PrintError):
         for item in inputs:
             self.add_input_info(item)
 
+        all_inputs_are_shuffled = False
         # change address
         if change_addr:
             change_addrs = [change_addr]
@@ -989,10 +990,14 @@ class Abstract_Wallet(PrintError):
             if (hasattr(self, 'is_coin_shuffled')
                 and hasattr(self, 'cashshuffle_get_new_change_address')
                 and all([bool(self.is_mine(i['address']) and self.is_coin_shuffled(i)) for i in inputs]) ):
-                # cashshuffle enabled: force a brand new change address if spending shuffled coins together
+                # Cashshuffle enabled: use a brand new change address if spending shuffled coins together and
                 # disregard the "use_change" setting since to preserve privacy we must use a new change adress each time.
+                # Pick and lock a new change address. this "locked" change address will not be used by the shuffle threads.
+                # Note that subsequent calls to this function will return the same change address until that address is involved
+                # in a tx and has a history, at which point a new address will get generated and "locked".
+                all_inputs_are_shuffled = True # <--- 'change' saving feature: this flag tells coinchooser below to prefer to send change back to inputs[0] if only 1 input, and ignore change altogerher
                 change_addrs = [self.cashshuffle_get_new_change_address()]
-                self.print_error("CashShuffle: forcing unique change address",change_addrs[0].to_ui_string())
+                self.print_error("CashShuffle: reserved unique change address",change_addrs[0].to_ui_string())
             else:
                 addrs = self.get_change_addresses()[-self.gap_limit_for_change:]
                 if self.use_change and addrs:
@@ -1019,7 +1024,7 @@ class Abstract_Wallet(PrintError):
             max_change = self.max_change_outputs if self.multiple_change else 1
             coin_chooser = coinchooser.CoinChooserPrivacy()
             tx = coin_chooser.make_tx(inputs, outputs, change_addrs[:max_change],
-                                      fee_estimator, self.dust_threshold())
+                                      fee_estimator, self.dust_threshold(), send_change_to_input_if_single_input = all_inputs_are_shuffled)
         else:
             sendable = sum(map(lambda x:x['value'], inputs))
             _type, data, value = outputs[i_max]

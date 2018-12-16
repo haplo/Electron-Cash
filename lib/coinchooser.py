@@ -28,6 +28,7 @@ from math import floor, log10
 from .bitcoin import sha256, COIN, TYPE_ADDRESS
 from .transaction import Transaction
 from .util import NotEnoughFunds, PrintError
+from .address import Address
 
 
 # A simple deterministic PRNG.  Used to deterministically shuffle a
@@ -166,7 +167,7 @@ class CoinChooserBase(PrintError):
         return change, dust
 
     def make_tx(self, coins, outputs, change_addrs, fee_estimator,
-                dust_threshold):
+                dust_threshold, send_change_to_input_if_single_input = False):
         '''Select unspent coins to spend to pay outputs.  If the change is
         greater than dust_threshold (after adding the change output to
         the transaction) it is kept, otherwise none is sent and it is
@@ -201,6 +202,14 @@ class CoinChooserBase(PrintError):
         # each pay-to-bitcoin-address output serializes as 34 bytes
         fee = lambda count: fee_estimator(tx_size + count * 34)
         change, dust = self.change_outputs(tx, change_addrs, fee, dust_threshold)
+        # CashShuffle extension -- if is a shuffled tx and only 1 input, force change back to self
+        if send_change_to_input_if_single_input and change and len(tx.inputs()) == 1:
+            i = tx.inputs()[0]
+            a = i.get('address')
+            if isinstance(a, Address):
+                change = [ (TYPE_ADDRESS, a, sum( [tup[2] for tup in change] )) ]
+                self.print_error("CashShuffle: tx with 1 input -- sending change back to input address",a.to_ui_string())
+
         tx.add_outputs(change)
         tx.ephemeral['dust_to_fee'] = dust
 

@@ -992,7 +992,7 @@ class Abstract_Wallet(PrintError):
                 and all([bool(self.is_mine(i['address']) and self.is_coin_shuffled(i)) for i in inputs]) ):
                 # Cashshuffle enabled: use a brand new change address if spending shuffled coins together and
                 # disregard the "use_change" setting since to preserve privacy we must use a new change adress each time.
-                # Pick and lock a new change address. this "locked" change address will not be used by the shuffle threads.
+                # Pick and lock a new change address. This "locked" change address will not be used by the shuffle threads.
                 # Note that subsequent calls to this function will return the same change address until that address is involved
                 # in a tx and has a history, at which point a new address will get generated and "locked".
                 all_inputs_are_shuffled = True # <--- 'change' saving feature: this flag tells coinchooser below to prefer to send change back to inputs[0] if only 1 input, and ignore change altogerher
